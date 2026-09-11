@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>カクポ (Kakupo) v0.1 - ローポリゴン 3Dモデリングツール</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+    :root {
+      --bg:#111827; --panel:#1e2a3a; --panel2:#0f2040;
+      --accent:#e94560; --accent2:#53d8fb; --accent3:#a8ff78; --accent4:#ffdd57;
+      --text:#eaf0fb; --text-dim:#7e91b0; --border:#2a3f6f;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:'M PLUS Rounded 1c',sans-serif;overflow:hidden;user-select:none;}
+    #canvas-container{position:fixed;inset:0;}
+    #canvas-container.draw{cursor:crosshair;}
+    #canvas-container.select{cursor:default;}
+
+    /* ── HEADER ─────────────────── */
+    #header{position:fixed;top:0;left:0;right:0;height:44px;background:linear-gradient(90deg,#0f3460,#1e2a3a);border-bottom:2px solid var(--accent2);display:flex;align-items:center;padding:0 12px;gap:14px;z-index:100;box-shadow:0 2px 16px rgba(83,216,251,.2);}
+    #logo{font-family:'Press Start 2P',monospace;font-size:13px;color:var(--accent2);text-shadow:0 0 12px var(--accent2);letter-spacing:2px;white-space:nowrap;}
+    #logo span{color:var(--accent);text-shadow:0 0 12px var(--accent);}
+    #version-tag{font-size:8px;color:var(--text-dim);font-family:'Press Start 2P',monospace;}
+    #undo-bar{display:flex;gap:4px;align-items:center;}
+    .ud-btn{height:24px;padding:0 8px;border-radius:6px;border:1.5px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;font-size:11px;transition:all .15s;}
+    .ud-btn:hover{border-color:var(--accent2);color:var(--accent2);}
+    .ud-btn:disabled{opacity:.3;cursor:not-allowed;}
+    #hist-info{font-size:8px;color:var(--text-dim);min-width:44px;text-align:center;}
+    #status-bar{margin-left:auto;display:flex;gap:8px;align-items:center;}
+    .status-pill{font-size:10px;padding:3px 10px;border-radius:20px;background:var(--panel2);border:1px solid var(--border);color:var(--text-dim);}
+    .status-pill.active{background:rgba(83,216,251,.15);border-color:var(--accent2);color:var(--accent2);}
+    .status-pill.snap-on{background:rgba(168,255,120,.12);border-color:var(--accent3);color:var(--accent3);}
+    #status-msg{font-size:10px;color:var(--accent4);max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+    /* ── LEFT TOOLBAR ───────────── */
+    #toolbar{position:fixed;top:54px;left:10px;width:58px;background:var(--panel);border:2px solid var(--border);border-radius:14px;padding:10px 6px;display:flex;flex-direction:column;gap:5px;z-index:100;box-shadow:0 4px 24px rgba(0,0,0,.5),0 0 10px rgba(83,216,251,.1);}
+    .tb-label{font-size:6px;text-align:center;color:var(--text-dim);letter-spacing:.5px;margin-top:2px;}
+    .tb-sep{height:1px;background:var(--border);margin:1px 0;}
+
+    .tool-btn{width:46px;height:44px;border-radius:10px;border:2px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:17px;transition:all .15s;}
+    .tool-btn .lbl{font-size:6px;color:inherit;}
+    .tool-btn:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(83,216,251,.10);}
+    .tool-btn.active{border-color:var(--accent2);color:var(--accent2);background:rgba(83,216,251,.18);box-shadow:0 0 12px rgba(83,216,251,.4);}
+    .tool-btn.active-draw{border-color:var(--accent3);color:var(--accent3);background:rgba(168,255,120,.18);box-shadow:0 0 12px rgba(168,255,120,.4);}
+    /* 辺のみモード: オレンジ */
+    .tool-btn.active-edge{border-color:#ffaa33;color:#ffaa33;background:rgba(255,170,51,.18);box-shadow:0 0 12px rgba(255,170,51,.4);}
+
+    .sel-btn{width:46px;height:30px;border-radius:8px;border:2px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;transition:all .15s;}
+    .sel-btn .lbl{font-size:6px;color:inherit;}
+    .sel-btn:hover{border-color:var(--accent4);color:var(--accent4);}
+    .sel-btn.active{border-color:var(--accent4);color:var(--accent4);background:rgba(255,221,87,.15);box-shadow:0 0 8px rgba(255,221,87,.3);}
+
+    .gz-btn{width:46px;height:30px;border-radius:8px;border:2px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;transition:all .15s;}
+    .gz-btn .lbl{font-size:6px;color:inherit;}
+    .gz-btn:hover,.gz-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(233,69,96,.15);box-shadow:0 0 8px rgba(233,69,96,.3);}
+
+    #snap-btn{width:46px;height:26px;border-radius:8px;border:2px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;font-size:8px;display:flex;align-items:center;justify-content:center;gap:3px;transition:all .15s;}
+    #snap-btn.on{border-color:var(--accent3);color:var(--accent3);background:rgba(168,255,120,.12);}
+
+    /* ── MIRROR BUTTONS ─────────── */
+    .mir-btn{width:46px;height:24px;border-radius:7px;border:2px solid var(--border);background:var(--panel2);color:var(--text-dim);cursor:pointer;font-size:11px;font-weight:bold;letter-spacing:1px;transition:all .15s;}
+    .mir-btn:hover{opacity:.85;}
+    .mir-btn.active-x{border-color:#ff4455;color:#ff4455;background:rgba(255,68,85,.18);box-shadow:0 0 8px rgba(255,68,85,.35);}
+    .mir-btn.active-y{border-color:#44dd66;color:#44dd66;background:rgba(68,221,102,.18);box-shadow:0 0 8px rgba(68,221,102,.35);}
+    .mir-btn.active-z{border-color:#4488ff;color:#4488ff;background:rgba(68,136,255,.18);box-shadow:0 0 8px rgba(68,136,255,.35);}
+
+    #del-btn{width:46px;height:26px;border-radius:8px;border:2px solid var(--accent);background:rgba(233,69,96,.08);color:var(--accent);cursor:pointer;font-size:10px;transition:all .15s;}
+    #del-btn:hover{background:rgba(233,69,96,.25);box-shadow:0 0 10px rgba(233,69,96,.4);}
+
+    /* ── VIEW BUTTONS ────────────── */
+    #view-panel{position:fixed;top:54px;right:10px;display:flex;flex-direction:column;gap:5px;z-index:100;}
+    #view-panel .vp-label{font-size:6px;text-align:center;color:var(--text-dim);font-family:'Press Start 2P',monospace;letter-spacing:.5px;}
+    .vb{width:54px;height:36px;border-radius:9px;border:2px solid var(--border);background:var(--panel);color:var(--text-dim);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:12px;transition:all .15s;box-shadow:0 2px 8px rgba(0,0,0,.4);}
+    .vb .lbl{font-size:6.5px;color:inherit;line-height:1;}
+    .vb:hover{border-color:var(--accent2);color:var(--accent2);background:rgba(83,216,251,.10);}
+    .vb.active-top{border-color:#a8ff78;color:#a8ff78;background:rgba(168,255,120,.15);box-shadow:0 0 10px rgba(168,255,120,.4);}
+    .vb.active-front{border-color:#00ccdd;color:#00ccdd;background:rgba(0,204,221,.15);box-shadow:0 0 10px rgba(0,204,221,.4);}
+    .vb.active-right{border-color:#cc44ff;color:#cc44ff;background:rgba(204,68,255,.15);box-shadow:0 0 10px rgba(204,68,255,.4);}
+    .vb.active-free{border-color:var(--accent2);color:var(--accent2);background:rgba(83,216,251,.15);box-shadow:0 0 10px rgba(83,216,251,.4);}
+
+    /* ── PLANE BADGE ─────────────── */
+    #plane-badge{position:fixed;top:54px;left:76px;height:22px;padding:0 10px;border-radius:11px;border:1.5px solid var(--border);background:var(--panel);font-size:9px;color:var(--text-dim);display:flex;align-items:center;gap:5px;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,.4);transition:all .3s;}
+    #plane-badge .dot{width:8px;height:8px;border-radius:50%;}
+
+    /* ── STATS ───────────────────── */
+    #stats{position:fixed;bottom:12px;left:76px;background:var(--panel);border:2px solid var(--border);border-radius:10px;padding:5px 12px;font-size:9px;color:var(--text-dim);z-index:100;display:flex;gap:14px;}
+    .stat span{color:var(--accent2);font-weight:bold;}
+
+    /* ── INFO ────────────────────── */
+    #info{position:fixed;bottom:12px;right:10px;width:220px;background:var(--panel);border:2px solid var(--border);border-radius:12px;padding:10px 12px;font-size:8px;color:var(--text-dim);z-index:100;line-height:1.95;}
+    #info .ititle{font-size:7px;color:var(--accent2);font-family:'Press Start 2P',monospace;display:block;margin-bottom:5px;}
+    #info kbd{display:inline-block;background:var(--panel2);border:1px solid var(--border);border-radius:3px;padding:1px 4px;font-size:7px;color:var(--accent4);font-family:monospace;}
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="header">
+  <div><div id="logo">カクポ <span>❖</span> KAKUPO</div><div id="version-tag">v0.1 PROTO</div></div>
+  <div id="undo-bar">
+    <button class="ud-btn" id="btn-undo" title="Ctrl+Z">↩ 元に戻す</button>
+    <span id="hist-info">0/0</span>
+    <button class="ud-btn" id="btn-redo" title="Ctrl+Y">↪ やり直し</button>
+  </div>
+  <div id="status-bar">
+    <div class="status-pill active" id="pill-mode">✏️ 頂点追加</div>
+    <div class="status-pill" id="pill-snap">🧲 スナップ OFF</div>
+    <div id="status-msg">クリックで頂点を追加 → 始点クリックで面を張る</div>
+  </div>
+</div>
+
+<!-- VIEW BUTTONS -->
+<div id="view-panel">
+  <div class="vp-label">VIEW</div>
+  <button class="vb active-free" id="vb-free"  title="自由視点 (0)">🎥<span class="lbl">Free</span></button>
+  <button class="vb" id="vb-top"   title="地面ビュー (7)">🔼<span class="lbl">Top</span></button>
+  <button class="vb" id="vb-front" title="正面ビュー (1)">⬛<span class="lbl">Front</span></button>
+  <button class="vb" id="vb-right" title="側面ビュー (3)">◀<span class="lbl">Right</span></button>
+</div>
+
+<!-- PLANE BADGE -->
+<div id="plane-badge">
+  <div class="dot" id="plane-dot" style="background:#53d8fb"></div>
+  <span id="plane-label">描画面: カメラ向き</span>
+</div>
+
+<!-- LEFT TOOLBAR -->
+<div id="toolbar">
+  <div class="tb-label">MODE</div>
+  <button class="tool-btn active-draw" id="btn-draw">✏️<span class="lbl">追加</span></button>
+  <button class="tool-btn" id="btn-select">🖱️<span class="lbl">選択</span></button>
+
+  <div class="tb-sep"></div>
+  <div class="tb-label">STROKE</div>
+  <!-- 面張りモード / 辺のみモード トグル -->
+  <button class="tool-btn active-draw" id="btn-stroke" title="面張り/辺のみ切り替え (F)">🔲<span class="lbl">面あり</span></button>
+
+  <div class="tb-sep"></div>
+  <div class="tb-label">SELECT</div>
+  <button class="sel-btn active" id="sel-vert">🔵<span class="lbl">頂点</span></button>
+  <button class="sel-btn" id="sel-edge">📏<span class="lbl">辺</span></button>
+  <button class="sel-btn" id="sel-face">🔷<span class="lbl">面</span></button>
+
+  <div class="tb-sep"></div>
+  <div class="tb-label">GIZMO</div>
+  <button class="gz-btn active" id="gz-translate">↔️<span class="lbl">移動</span></button>
+  <button class="gz-btn" id="gz-rotate">🔄<span class="lbl">回転</span></button>
+  <button class="gz-btn" id="gz-scale">⤡<span class="lbl">拡縮</span></button>
+
+  <div class="tb-sep"></div>
+  <div class="tb-label">SNAP</div>
+  <button id="snap-btn">🧲&nbsp;OFF</button>
+
+  <div class="tb-sep"></div>
+  <div class="tb-label">MIRROR</div>
+  <button class="mir-btn" id="mir-x" title="Xミラー">X</button>
+  <button class="mir-btn" id="mir-y" title="Yミラー">Y</button>
+  <button class="mir-btn" id="mir-z" title="Zミラー">Z</button>
+
+  <div class="tb-sep"></div>
+  <button id="del-btn" title="Delete">🗑️</button>
+</div>
+
+<!-- CANVAS -->
+<div id="canvas-container" class="draw"></div>
+
+<!-- STATS -->
+<div id="stats">
+  <div class="stat">頂点 <span id="sv">0</span></div>
+  <div class="stat">辺 <span id="se">0</span></div>
+  <div class="stat">面 <span id="sf">0</span></div>
+</div>
+
+<!-- INFO -->
+<div id="info">
+  <span class="ititle">⌨ CONTROLS</span>
+  <div><kbd>中ドラッグ</kbd> 回転 / <kbd>Shift+中</kbd> パン</div>
+  <div><kbd>Alt+左</kbd> 回転 / <kbd>ホイール</kbd> ズーム</div>
+  <div><kbd>1</kbd> Front / <kbd>3</kbd> Right / <kbd>7</kbd> Top / <kbd>0</kbd> Free</div>
+  <div><kbd>Tab</kbd> モード切替 / <kbd>F</kbd> 面あり↔辺のみ</div>
+  <div><kbd>G</kbd> 移動 / <kbd>R</kbd> 回転 / <kbd>S</kbd> 拡縮</div>
+  <div><kbd>X</kbd> スナップ / <kbd>Del</kbd> 削除 / <kbd>Esc</kbd> キャンセル</div>
+  <div><kbd>Ctrl+Z</kbd> Undo / <kbd>Ctrl+Y</kbd> Redo</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.167.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { TransformControls } from 'three/addons/controls/TransformControls.js';
+
+// ════════════════════════════════════════════
+//  RENDERER / SCENE / CAMERA
+// ════════════════════════════════════════════
+const container = document.getElementById('canvas-container');
+const renderer  = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(container.clientWidth, container.clientHeight);
+renderer.shadowMap.enabled = true;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x111827);
+
+const camera = new THREE.PerspectiveCamera(55, container.clientWidth / container.clientHeight, 0.01, 500);
+
+const cam = { target: new THREE.Vector3(), radius: 10, theta: Math.PI * 0.35, phi: 1.05 };
+function syncCamera() {
+  cam.phi = Math.max(0.005, Math.min(Math.PI - 0.005, cam.phi));
+  camera.position.set(
+    cam.target.x + cam.radius * Math.sin(cam.phi) * Math.sin(cam.theta),
+    cam.target.y + cam.radius * Math.cos(cam.phi),
+    cam.target.z + cam.radius * Math.sin(cam.phi) * Math.cos(cam.theta),
+  );
+  camera.lookAt(cam.target);
+}
+syncCamera();
+
+// ── LIGHTS ────────────────────────────────
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+sun.position.set(6, 10, 5); sun.castShadow = true; scene.add(sun);
+const fill = new THREE.DirectionalLight(0x4488ff, 0.25);
+fill.position.set(-5, 3, -6); scene.add(fill);
+
+// ════════════════════════════════════════════
+//  GRID & AXES (persistent)
+// ════════════════════════════════════════════
+function mkLine(ax,ay,az,bx,by,bz,col) {
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(ax,ay,az),new THREE.Vector3(bx,by,bz)]),
+    new THREE.LineBasicMaterial({ color: col })
+  );
+}
+const groundGrid = new THREE.GridHelper(20,20,0x334466,0x223355);
+groundGrid.material.transparent = true; groundGrid.material.opacity = 0.75;
+scene.add(groundGrid);
+scene.add(mkLine(-10,.005,0,10,.005,0,0xff4455));
+scene.add(mkLine(0,.005,-10,0,.005,10,0x4488ff));
+scene.add(mkLine(0,0,0,0,3,0,0x44dd66));
+for (let i = -10; i <= 10; i++) {
+  if (!i) continue;
+  scene.add(mkLine(i,0,-.06,i,0,.06,0x445577));
+  scene.add(mkLine(-.06,0,i,.06,0,i,0x445577));
+}
+const originMesh = new THREE.Mesh(new THREE.SphereGeometry(.07,12,12),
+  new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0xaaaaaa, roughness:.2 }));
+scene.add(originMesh);
+function axisDot(x,y,z,c) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.055,8,8),
+    new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:.6 }));
+  m.position.set(x,y,z); scene.add(m);
+}
+axisDot(1,.005,0,0xff4455); axisDot(-1,.005,0,0xff4455);
+axisDot(0,.005,1,0x4488ff); axisDot(0,.005,-1,0x4488ff);
+axisDot(0,1,0,0x44dd66);
+function mkLabel(text,x,y,z,col) {
+  const c = Object.assign(document.createElement('canvas'),{width:64,height:64});
+  const ctx = c.getContext('2d');
+  ctx.font='bold 40px Arial'; ctx.fillStyle=col;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(text,32,32);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map:new THREE.CanvasTexture(c), transparent:true, depthTest:false }));
+  sp.position.set(x,y,z); sp.scale.set(.5,.5,.5); scene.add(sp);
+}
+mkLabel('X',10.6,.005,0,'#ff4455');
+mkLabel('Z',0,.005,10.6,'#4488ff');
+mkLabel('Y',0,3.5,0,'#44dd66');
+
+// ── DRAW PLANE GRIDS ──────────────────────
+function mkDrawGrid(c1,c2) {
+  const g = new THREE.GridHelper(10,20,c2,c1);
+  g.material.transparent=true; g.material.opacity=0.45; g.visible=false; scene.add(g); return g;
+}
+const topDrawGrid   = mkDrawGrid(0x88ff88,0x44cc44);
+const frontDrawGrid = mkDrawGrid(0x00aacc,0x00eeff);
+const rightDrawGrid = mkDrawGrid(0xaa22cc,0xdd55ff);
+frontDrawGrid.rotation.x = Math.PI/2;
+rightDrawGrid.rotation.z = -Math.PI/2;
+
+// ════════════════════════════════════════════
+//  DRAW PLANES & VIEW SYSTEM
+// ════════════════════════════════════════════
+const PLANES = {
+  top:   new THREE.Plane(new THREE.Vector3(0,1,0),0),
+  front: new THREE.Plane(new THREE.Vector3(0,0,1),0),
+  right: new THREE.Plane(new THREE.Vector3(1,0,0),0),
+};
+const VIEW_PRESETS = {
+  top:   { theta:0,            phi:0.07 },
+  front: { theta:0,            phi:Math.PI/2 },
+  right: { theta:Math.PI/2,   phi:Math.PI/2 },
+};
+const VIEW_CFG = {
+  top:  { dotColor:'#a8ff78', label:'地面 (XZ)',   cls:'active-top'   },
+  front:{ dotColor:'#00ccdd', label:'正面 (XY)',   cls:'active-front' },
+  right:{ dotColor:'#cc44ff', label:'側面 (YZ)',   cls:'active-right' },
+  free: { dotColor:'#53d8fb', label:'カメラ向き',  cls:'active-free'  },
+};
+
+let currentView = 'free';
+let viewAnim = null;
+
+function shortestArc(f,t) { let d=(t-f)%(Math.PI*2); if(d>Math.PI)d-=Math.PI*2; if(d<-Math.PI)d+=Math.PI*2; return d; }
+function easeIO(t) { return t<.5?2*t*t:-1+(4-2*t)*t; }
+
+function setView(v) {
+  currentView = v;
+  if (VIEW_PRESETS[v]) {
+    viewAnim = { fromT:cam.theta, fromP:cam.phi, dT:shortestArc(cam.theta,VIEW_PRESETS[v].theta), dP:VIEW_PRESETS[v].phi-cam.phi, prog:0 };
+  }
+  topDrawGrid.visible   = v==='top';
+  frontDrawGrid.visible = v==='front';
+  rightDrawGrid.visible = v==='right';
+  ['top','front','right','free'].forEach(k => {
+    document.getElementById('vb-'+k).className = 'vb '+(k===v?VIEW_CFG[k].cls:'');
+  });
+  const cfg = VIEW_CFG[v];
+  document.getElementById('plane-dot').style.background   = cfg.dotColor;
+  document.getElementById('plane-label').textContent       = '描画面: '+cfg.label;
+  document.getElementById('plane-badge').style.borderColor = cfg.dotColor;
+}
+
+function tickCameraAnim() {
+  if (!viewAnim) return;
+  viewAnim.prog = Math.min(1, viewAnim.prog + 0.055);
+  const t = easeIO(viewAnim.prog);
+  cam.theta = viewAnim.fromT + viewAnim.dT * t;
+  cam.phi   = viewAnim.fromP + viewAnim.dP * t;
+  syncCamera();
+  if (viewAnim.prog >= 1) viewAnim = null;
+}
+
+const _fgDir = new THREE.Vector3();
+const _fgQ   = new THREE.Quaternion();
+const _fgUp  = new THREE.Vector3(0,1,0);
+function tickFreeGrid() { /* free grid hidden, no-op */ }
+
+// ════════════════════════════════════════════
+//  MESH DATA
+// ════════════════════════════════════════════
+const MD = { verts:[], edges:[], faces:[] };
+
+const mkV = c => new THREE.MeshStandardMaterial({ color:c, emissive:c, emissiveIntensity:.22, roughness:.35, metalness:.2 });
+const mkE = c => new THREE.LineBasicMaterial({ color:c });
+const mkF = c => new THREE.MeshStandardMaterial({ color:c, roughness:.6, metalness:.1, transparent:true, opacity:.72, side:THREE.DoubleSide });
+const COL = { vert:0x53d8fb, vertStart:0xa8ff78, vertSel:0xffdd57, vertHov:0xffffff,
+              edge:0x4ab8d4, edgeSel:0xffdd57, face:0x1a5a7a, faceSel:0xc49a0a };
+
+function _addVertex(pos) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(.1,12,12), mkV(COL.vert));
+  m.position.copy(pos); m.castShadow=true; scene.add(m);
+  const i=MD.verts.length; MD.verts.push({ pos:pos.clone(), obj:m }); return i;
+}
+function _addEdge(a,b) {
+  const geo=new THREE.BufferGeometry().setFromPoints([MD.verts[a].pos,MD.verts[b].pos]);
+  const ln=new THREE.Line(geo,mkE(COL.edge)); scene.add(ln);
+  const i=MD.edges.length; MD.edges.push({ a,b,obj:ln }); return i;
+}
+function _addFace(vis) {
+  if(vis.length<3) return -1;
+  const vs=vis.map(vi=>MD.verts[vi].pos), pa=[];
+  for(let i=1;i<vs.length-1;i++) pa.push(vs[0].x,vs[0].y,vs[0].z,vs[i].x,vs[i].y,vs[i].z,vs[i+1].x,vs[i+1].y,vs[i+1].z);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pa),3));
+  geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo,mkF(COL.face)); m.castShadow=true; m.receiveShadow=true; scene.add(m);
+  const i=MD.faces.length; MD.faces.push({ verts:[...vis],obj:m }); return i;
+}
+function rebuildEdge(e) {
+  e.obj.geometry.setFromPoints([MD.verts[e.a].pos,MD.verts[e.b].pos]);
+  e.obj.geometry.attributes.position.needsUpdate=true;
+}
+function rebuildFace(fi) {
+  const f=MD.faces[fi], vs=f.verts.map(vi=>MD.verts[vi].pos), pa=[];
+  for(let i=1;i<vs.length-1;i++) pa.push(vs[0].x,vs[0].y,vs[0].z,vs[i].x,vs[i].y,vs[i].z,vs[i+1].x,vs[i+1].y,vs[i+1].z);
+  f.obj.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(pa),3));
+  f.obj.geometry.attributes.position.needsUpdate=true;
+  f.obj.geometry.computeVertexNormals();
+}
+function updateConnected(vi) {
+  MD.edges.forEach(e=>{ if(e.a===vi||e.b===vi) rebuildEdge(e); });
+  MD.faces.forEach((_,fi)=>{ if(MD.faces[fi].verts.includes(vi)) rebuildFace(fi); });
+  markMirrorDirty();
+}
+
+// ════════════════════════════════════════════
+//  MIRROR SYSTEM
+// ════════════════════════════════════════════
+const mirrorState = { x:false, y:false, z:false };
+const mirrorGroup = new THREE.Group();
+scene.add(mirrorGroup);
+
+// Shared materials for mirrored objects (distinct magenta/purple hue)
+const mirMatV = new THREE.MeshStandardMaterial({ color:0xff66cc, emissive:0x551144, roughness:.3, transparent:true, opacity:.75 });
+const mirMatE = new THREE.LineBasicMaterial({ color:0xee44aa, transparent:true, opacity:.8 });
+const mirMatF = new THREE.MeshStandardMaterial({ color:0x881177, roughness:.5, metalness:.1, transparent:true, opacity:.52, side:THREE.DoubleSide });
+
+function getMirrorTransforms() {
+  const active = ['x','y','z'].filter(a => mirrorState[a]);
+  const n = active.length;
+  if (!n) return [];
+  const transforms = [];
+  for (let mask = 1; mask < (1 << n); mask++) {
+    const flip = [1,1,1];
+    for (let i = 0; i < n; i++) {
+      if (mask & (1<<i)) {
+        if (active[i]==='x') flip[0]=-1;
+        else if (active[i]==='y') flip[1]=-1;
+        else flip[2]=-1;
+      }
+    }
+    transforms.push(flip);
+  }
+  return transforms;
+}
+
+function mVec(v, flip) { return new THREE.Vector3(v.x*flip[0], v.y*flip[1], v.z*flip[2]); }
+
+function mirFacePosArray(verts, flip) {
+  let vs = verts.map(v => mVec(v, flip));
+  if (flip.filter(f=>f===-1).length % 2 === 1) vs = vs.slice().reverse();
+  const pa = [];
+  for (let i=1;i<vs.length-1;i++) pa.push(vs[0].x,vs[0].y,vs[0].z,vs[i].x,vs[i].y,vs[i].z,vs[i+1].x,vs[i+1].y,vs[i+1].z);
+  return pa;
+}
+
+let mirDirty = false;
+function markMirrorDirty() { mirDirty = true; }
+
+function rebuildMirrors() {
+  // Remove all children
+  while (mirrorGroup.children.length) mirrorGroup.remove(mirrorGroup.children[0]);
+
+  const transforms = getMirrorTransforms();
+  if (!transforms.length) return;
+
+  transforms.forEach(flip => {
+    MD.verts.forEach(v => {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(.1,8,8), mirMatV);
+      m.position.copy(mVec(v.pos, flip));
+      mirrorGroup.add(m);
+    });
+    MD.edges.forEach(e => {
+      const geo = new THREE.BufferGeometry().setFromPoints([mVec(MD.verts[e.a].pos,flip), mVec(MD.verts[e.b].pos,flip)]);
+      mirrorGroup.add(new THREE.Line(geo, mirMatE));
+    });
+    MD.faces.forEach(f => {
+      const pa = mirFacePosArray(f.verts.map(vi=>MD.verts[vi].pos), flip);
+      if (!pa.length) return;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pa),3));
+      geo.computeVertexNormals();
+      mirrorGroup.add(new THREE.Mesh(geo, mirMatF));
+    });
+  });
+}
+
+function toggleMirror(axis) {
+  mirrorState[axis] = !mirrorState[axis];
+  const btn = document.getElementById('mir-'+axis);
+  btn.className = 'mir-btn' + (mirrorState[axis] ? ' active-'+axis : '');
+  rebuildMirrors();
+  const on = Object.values(mirrorState).some(Boolean);
+  setStatus(on ? `🪞 ミラー: ${mirrorState.x?'X ':''}${mirrorState.y?'Y ':''}${mirrorState.z?'Z ':''} ON` : '🪞 ミラー OFF');
+}
+
+// Mirror preview objects (up to 7 copies)
+const MIR_MAX = 7;
+const mirPrevDots = [];
+const mirPrevLines = [];
+for (let i = 0; i < MIR_MAX; i++) {
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(.07,8,8),
+    new THREE.MeshStandardMaterial({ color:0xff77cc, emissive:0x661144, transparent:true, opacity:.6 }));
+  dot.visible=false; scene.add(dot); mirPrevDots.push(dot);
+  const arr=new Float32Array(6);
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(arr,3));
+  const ln=new THREE.Line(geo,new THREE.LineBasicMaterial({ color:0xee55bb, transparent:true, opacity:.5 }));
+  ln.visible=false; scene.add(ln);
+  mirPrevLines.push({ ln, arr });
+}
+
+function updateMirrorPreviews(pos) {
+  const transforms = getMirrorTransforms();
+  mirPrevDots.forEach((dot,i) => {
+    if (i < transforms.length) {
+      const flip=transforms[i];
+      const mp=mVec(pos,flip);
+      dot.position.copy(mp); dot.visible=true;
+      const {ln,arr}=mirPrevLines[i];
+      if (drawPath.length>0) {
+        const lp=mVec(MD.verts[drawPath[drawPath.length-1]].pos,flip);
+        arr[0]=lp.x;arr[1]=lp.y;arr[2]=lp.z;arr[3]=mp.x;arr[4]=mp.y;arr[5]=mp.z;
+        ln.geometry.attributes.position.needsUpdate=true; ln.visible=true;
+      } else { ln.visible=false; }
+    } else {
+      dot.visible=false; mirPrevLines[i].ln.visible=false;
+    }
+  });
+}
+
+function hideMirrorPreviews() {
+  mirPrevDots.forEach(d=>d.visible=false);
+  mirPrevLines.forEach(({ln})=>ln.visible=false);
+}
+
+// ════════════════════════════════════════════
+//  UNDO / REDO
+// ════════════════════════════════════════════
+const history=[];
+let histCursor=-1;
+function makeSnap() {
+  return {
+    verts:MD.verts.map(v=>[v.pos.x,v.pos.y,v.pos.z]),
+    edges:MD.edges.map(e=>[e.a,e.b]),
+    faces:MD.faces.map(f=>[...f.verts]),
+  };
+}
+function pushSnap() {
+  history.splice(histCursor+1);
+  history.push(makeSnap());
+  histCursor=history.length-1;
+  updateHistUI();
+}
+function applySnap(snap) {
+  MD.verts.forEach(v=>scene.remove(v.obj));
+  MD.edges.forEach(e=>scene.remove(e.obj));
+  MD.faces.forEach(f=>scene.remove(f.obj));
+  MD.verts=[]; MD.edges=[]; MD.faces=[];
+  cancelDraw(); clearSelection();
+  snap.verts.forEach(v=>_addVertex(new THREE.Vector3(v[0],v[1],v[2])));
+  snap.edges.forEach(e=>_addEdge(e[0],e[1]));
+  snap.faces.forEach(f=>_addFace([...f]));
+  updateStats(); rebuildMirrors();
+}
+function undo() { if(histCursor<=0)return; histCursor--; applySnap(history[histCursor]); updateHistUI(); setStatus('↩️ 元に戻しました'); }
+function redo() { if(histCursor>=history.length-1)return; histCursor++; applySnap(history[histCursor]); updateHistUI(); setStatus('↪️ やり直しました'); }
+function updateHistUI() {
+  document.getElementById('hist-info').textContent=`${histCursor}/${history.length-1}`;
+  document.getElementById('btn-undo').disabled=histCursor<=0;
+  document.getElementById('btn-redo').disabled=histCursor>=history.length-1;
+}
+
+// ════════════════════════════════════════════
+//  RAYCASTER & PLANE HIT
+// ════════════════════════════════════════════
+const raycaster=new THREE.Raycaster();
+raycaster.params.Line={threshold:.08};
+function toNDC(e) {
+  const r=renderer.domElement.getBoundingClientRect();
+  return new THREE.Vector2(((e.clientX-r.left)/r.width)*2-1,-((e.clientY-r.top)/r.height)*2+1);
+}
+
+let snapEnabled=false;
+let drawPath=[];
+
+function getActivePlane() {
+  if (currentView==='top')   return PLANES.top;
+  if (currentView==='front') return PLANES.front;
+  if (currentView==='right') return PLANES.right;
+  const anchor=drawPath.length>0 ? MD.verts[drawPath[0]].pos.clone() : new THREE.Vector3();
+  const normal=new THREE.Vector3(); camera.getWorldDirection(normal);
+  return new THREE.Plane().setFromNormalAndCoplanarPoint(normal,anchor);
+}
+const MIRROR_SNAP_DIST = 0.25;
+function snapToMirrorAxis(v) {
+  if (mirrorState.x && Math.abs(v.x) < MIRROR_SNAP_DIST) v.x = 0;
+  if (mirrorState.y && Math.abs(v.y) < MIRROR_SNAP_DIST) v.y = 0;
+  if (mirrorState.z && Math.abs(v.z) < MIRROR_SNAP_DIST) v.z = 0;
+  return v;
+}
+
+function planeHit(e) {
+  raycaster.setFromCamera(toNDC(e),camera);
+  const plane=getActivePlane(), v=new THREE.Vector3();
+  if(!raycaster.ray.intersectPlane(plane,v)) return null;
+  if(v.length()>200) return null;
+  if(snapEnabled) {
+    const s=.5;
+    v.x=Math.round(v.x/s)*s; v.y=Math.round(v.y/s)*s; v.z=Math.round(v.z/s)*s;
+    if(currentView==='top')   v.y=0;
+    if(currentView==='front') v.z=0;
+    if(currentView==='right') v.x=0;
+    if(currentView==='free')  plane.projectPoint(v,v);
+  }
+  snapToMirrorAxis(v);
+  return v;
+}
+function hitVerts(e) { raycaster.setFromCamera(toNDC(e),camera); return raycaster.intersectObjects(MD.verts.map(v=>v.obj)); }
+function hitFaces(e) { raycaster.setFromCamera(toNDC(e),camera); return raycaster.intersectObjects(MD.faces.map(f=>f.obj)); }
+
+// ════════════════════════════════════════════
+//  PREVIEW OBJECTS
+// ════════════════════════════════════════════
+const previewDot=new THREE.Mesh(new THREE.SphereGeometry(.07,8,8),
+  new THREE.MeshStandardMaterial({ color:0xffffff, emissive:0x9999cc, transparent:true, opacity:.55 }));
+previewDot.visible=false; scene.add(previewDot);
+
+const pvArr=new Float32Array(6);
+const pvGeo=new THREE.BufferGeometry();
+pvGeo.setAttribute('position',new THREE.BufferAttribute(pvArr,3));
+const pvLine=new THREE.Line(pvGeo,new THREE.LineBasicMaterial({ color:0xffffff, transparent:true, opacity:.4 }));
+pvLine.visible=false; scene.add(pvLine);
+
+function setPreviewLine(from,to) {
+  pvArr[0]=from.x;pvArr[1]=from.y;pvArr[2]=from.z;
+  pvArr[3]=to.x; pvArr[4]=to.y; pvArr[5]=to.z;
+  pvGeo.attributes.position.needsUpdate=true;
+}
+
+// ════════════════════════════════════════════
+//  TRANSFORM CONTROLS + DUMMY
+// ════════════════════════════════════════════
+const tc=new TransformControls(camera,renderer.domElement);
+const dummy=new THREE.Object3D();
+scene.add(tc); scene.add(dummy);
+tc.setMode('translate');
+
+let dummyInfo=null, tcDragging=false, gizmoMode='translate';
+
+tc.addEventListener('dragging-changed', e => {
+  tcDragging=e.value;
+  if(e.value) {
+    if(tc.object===dummy&&dummyInfo) {
+      dummyInfo.initPos=dummy.position.clone();
+      dummyInfo.initQuat=dummy.quaternion.clone();
+      dummyInfo.initScale=dummy.scale.clone();
+      dummyInfo.initVerts=dummyInfo.targetVerts.map(vi=>MD.verts[vi].pos.clone());
+    }
+  } else {
+    pushSnap(); rebuildMirrors();
+  }
+});
+tc.addEventListener('change', () => {
+  const obj=tc.object; if(!obj) return;
+  if(obj===dummy) { applyDummyTransform(); return; }
+  const vi=MD.verts.findIndex(v=>v.obj===obj);
+  if(vi!==-1) {
+    snapToMirrorAxis(obj.position);
+    MD.verts[vi].pos.copy(obj.position);
+    updateConnected(vi);
+  }
+});
+function applyDummyTransform() {
+  if(!dummyInfo?.initVerts) return;
+  const {targetVerts,initPos,initQuat,initScale,initVerts}=dummyInfo;
+  const dPos=dummy.position.clone().sub(initPos);
+  const dQuat=dummy.quaternion.clone().multiply(initQuat.clone().invert());
+  const sx=dummy.scale.x/initScale.x, sy=dummy.scale.y/initScale.y, sz=dummy.scale.z/initScale.z;
+  targetVerts.forEach((vi,i)=>{
+    const init=initVerts[i], pos=MD.verts[vi].pos;
+    if(gizmoMode==='translate') { pos.copy(init).add(dPos); }
+    else if(gizmoMode==='rotate') { const l=init.clone().sub(initPos); l.applyQuaternion(dQuat); pos.copy(l.add(initPos)); }
+    else { const l=init.clone().sub(initPos); l.x*=sx;l.y*=sy;l.z*=sz; pos.copy(l.add(initPos)); }
+    snapToMirrorAxis(pos);
+    MD.verts[vi].obj.position.copy(pos);
+  });
+  targetVerts.forEach(vi=>updateConnected(vi));
+  markMirrorDirty();
+}
+function attachDummy(center,targetVerts,type,idx) {
+  dummy.position.copy(center); dummy.rotation.set(0,0,0); dummy.scale.set(1,1,1);
+  dummyInfo={type,idx,targetVerts,initPos:center.clone(),initQuat:new THREE.Quaternion(),initScale:new THREE.Vector3(1,1,1),initVerts:null};
+  tc.attach(dummy); tc.setMode(gizmoMode);
+}
+
+// ════════════════════════════════════════════
+//  APP STATE
+// ════════════════════════════════════════════
+let mode='draw', selSub='vert', strokeFaceMode=true;
+const selected=new Set();
+let hoverIdx=-1;
+
+// ════════════════════════════════════════════
+//  DRAW MODE
+// ════════════════════════════════════════════
+function handleDrawClick(e) {
+  if(e.button!==0||e.altKey) return;
+  const vhits=hitVerts(e);
+  if(vhits.length>0) {
+    const hi=MD.verts.findIndex(v=>v.obj===vhits[0].object);
+    if(hi===-1) return;
+    // Click the start vertex to close
+    if(hi===drawPath[0]) {
+      if(strokeFaceMode && drawPath.length>=3) { closeFace(); return; }
+      if(!strokeFaceMode && drawPath.length>=2) { closeEdgeOnly(); return; }
+      return; // not enough verts yet
+    }
+    if(drawPath.length>0 && hi===drawPath[drawPath.length-1]) return;
+    if(drawPath.length>0) _addEdge(drawPath[drawPath.length-1],hi);
+    drawPath.push(hi); refreshHL(); updateStats(); updateStatusDraw();
+    return;
+  }
+  const pos=planeHit(e); if(!pos) return;
+  const ni=_addVertex(pos);
+  if(drawPath.length>0) _addEdge(drawPath[drawPath.length-1],ni);
+  drawPath.push(ni); refreshHL(); updateStats(); pushSnap(); markMirrorDirty(); updateStatusDraw();
+}
+
+function closeFace() {
+  _addEdge(drawPath[drawPath.length-1],drawPath[0]);
+  _addFace([...drawPath]);
+  cancelDraw(); updateStats(); pushSnap(); rebuildMirrors();
+  setStatus('✅ 面を作成！ クリックして次の頂点を追加');
+}
+function closeEdgeOnly() {
+  _addEdge(drawPath[drawPath.length-1],drawPath[0]);
+  cancelDraw(); updateStats(); pushSnap(); rebuildMirrors();
+  setStatus('✅ 辺を追加しました');
+}
+function cancelDraw() {
+  drawPath.forEach(vi=>{ if(MD.verts[vi]) MD.verts[vi].obj.material=mkV(COL.vert); });
+  drawPath=[]; pvLine.visible=false;
+  previewDot.visible=mode==='draw';
+  hideMirrorPreviews(); hoverIdx=-1;
+}
+function refreshHL() {
+  MD.verts.forEach((v,i)=>{
+    v.obj.material=(drawPath.length>0&&i===drawPath[0])?mkV(COL.vertStart):mkV(COL.vert);
+  });
+}
+function updateStatusDraw() {
+  const viewLabel=VIEW_CFG[currentView].label;
+  const modeLabel=strokeFaceMode?'面張り':'辺のみ';
+  if(drawPath.length===0) setStatus(`✏️ [${viewLabel}/${modeLabel}] クリックで頂点を追加`);
+  else if(strokeFaceMode&&drawPath.length<3) setStatus(`✏️ ${drawPath.length}点 → あと${3-drawPath.length}点で面が作れます`);
+  else setStatus(`✏️ ${drawPath.length}点 → 【始点（緑）をクリック】で${strokeFaceMode?'面を閉じる':'辺を閉じる'}！`);
+}
+
+// ════════════════════════════════════════════
+//  SELECT MODE
+// ════════════════════════════════════════════
+function handleSelectClick(e) {
+  if(e.button!==0||e.altKey) return;
+  clearSelection();
+  if(selSub==='vert') {
+    const hits=hitVerts(e);
+    if(hits.length>0) {
+      const vi=MD.verts.findIndex(v=>v.obj===hits[0].object);
+      if(vi===-1) return;
+      selected.add(vi); MD.verts[vi].obj.material=mkV(COL.vertSel);
+      tc.attach(MD.verts[vi].obj); tc.setMode(gizmoMode);
+      setStatus(`選択中: 頂点 #${vi}`);
+    }
+  } else if(selSub==='edge') {
+    const ndc=toNDC(e); let best={dist:.06,idx:-1};
+    MD.edges.forEach((edge,ei)=>{
+      const a=MD.verts[edge.a].pos.clone().project(camera);
+      const b=MD.verts[edge.b].pos.clone().project(camera);
+      const d=ptSeg2D(ndc,a,b);
+      if(d<best.dist) best={dist:d,idx:ei};
+    });
+    if(best.idx!==-1) {
+      const ei=best.idx; selected.add(ei); MD.edges[ei].obj.material=mkE(COL.edgeSel);
+      const mid=MD.verts[MD.edges[ei].a].pos.clone().add(MD.verts[MD.edges[ei].b].pos).multiplyScalar(.5);
+      attachDummy(mid,[MD.edges[ei].a,MD.edges[ei].b],'edge',ei);
+      setStatus(`選択中: 辺 #${ei} (G/R/S)`);
+    }
+  } else {
+    const hits=hitFaces(e);
+    if(hits.length>0) {
+      const fi=MD.faces.findIndex(f=>f.obj===hits[0].object);
+      if(fi===-1) return;
+      selected.add(fi); MD.faces[fi].obj.material=mkF(COL.faceSel);
+      const c=new THREE.Vector3();
+      MD.faces[fi].verts.forEach(vi=>c.add(MD.verts[vi].pos));
+      c.divideScalar(MD.faces[fi].verts.length);
+      attachDummy(c,[...MD.faces[fi].verts],'face',fi);
+      setStatus(`選択中: 面 #${fi} (G/R/S)`);
+    }
+  }
+}
+function ptSeg2D(p,a,b) {
+  const abx=b.x-a.x,aby=b.y-a.y,apx=p.x-a.x,apy=p.y-a.y,l2=abx*abx+aby*aby;
+  if(!l2) return Math.hypot(apx,apy);
+  const t=Math.max(0,Math.min(1,(apx*abx+apy*aby)/l2));
+  return Math.hypot(p.x-(a.x+t*abx),p.y-(a.y+t*aby));
+}
+function clearSelection() {
+  selected.forEach(idx=>{
+    if(selSub==='vert'&&MD.verts[idx]) MD.verts[idx].obj.material=mkV(COL.vert);
+    else if(selSub==='edge'&&MD.edges[idx]) MD.edges[idx].obj.material=mkE(COL.edge);
+    else if(selSub==='face'&&MD.faces[idx]) MD.faces[idx].obj.material=mkF(COL.face);
+  });
+  selected.clear(); tc.detach(); dummyInfo=null;
+}
+
+// ════════════════════════════════════════════
+//  DELETE
+// ════════════════════════════════════════════
+function deleteSelected() {
+  if(!selected.size) return;
+  const arr=[...selected].sort((a,b)=>b-a);
+  if(selSub==='vert') {
+    for(let fi=MD.faces.length-1;fi>=0;fi--)
+      if(MD.faces[fi].verts.some(vi=>arr.includes(vi))) { scene.remove(MD.faces[fi].obj); MD.faces.splice(fi,1); }
+    for(let ei=MD.edges.length-1;ei>=0;ei--)
+      if(arr.includes(MD.edges[ei].a)||arr.includes(MD.edges[ei].b)) { scene.remove(MD.edges[ei].obj); MD.edges.splice(ei,1); }
+    arr.forEach(vi=>{ scene.remove(MD.verts[vi].obj); MD.verts.splice(vi,1); });
+  } else if(selSub==='edge') {
+    arr.forEach(ei=>{ scene.remove(MD.edges[ei].obj); MD.edges.splice(ei,1); });
+  } else {
+    arr.forEach(fi=>{ scene.remove(MD.faces[fi].obj); MD.faces.splice(fi,1); });
+  }
+  selected.clear(); tc.detach(); dummyInfo=null;
+  updateStats(); pushSnap(); rebuildMirrors(); setStatus('🗑️ 削除しました');
+}
+
+// ════════════════════════════════════════════
+//  CAMERA INPUT
+// ════════════════════════════════════════════
+let isOrbiting=false, isPanning=false, orbitLX=0, orbitLY=0;
+let dragSX=0, dragSY=0, wasDragging=false;
+
+renderer.domElement.addEventListener('pointerdown', e => {
+  dragSX=e.clientX; dragSY=e.clientY; wasDragging=false;
+  if(e.button===1||(e.button===0&&e.altKey)) {
+    e.shiftKey?(isPanning=true):(isOrbiting=true);
+    orbitLX=e.clientX; orbitLY=e.clientY; e.preventDefault();
+  }
+});
+window.addEventListener('pointerup',()=>{ isOrbiting=false; isPanning=false; });
+
+window.addEventListener('pointermove', e => {
+  if(Math.hypot(e.clientX-dragSX,e.clientY-dragSY)>5) wasDragging=true;
+
+  if(isOrbiting||isPanning) {
+    const dx=e.clientX-orbitLX, dy=e.clientY-orbitLY;
+    orbitLX=e.clientX; orbitLY=e.clientY;
+    if(isPanning) {
+      const right=new THREE.Vector3(); camera.getWorldDirection(right);
+      right.cross(camera.up).normalize();
+      const spd=cam.radius*.0018;
+      cam.target.addScaledVector(right,-dx*spd);
+      cam.target.addScaledVector(camera.up,dy*spd);
+    } else {
+      cam.theta-=dx*.008; cam.phi-=dy*.008;
+      viewAnim=null;
+      if(currentView!=='free') setView('free');
+    }
+    syncCamera(); return;
+  }
+
+  if(mode==='draw') {
+    const pos=planeHit(e);
+    if(pos) {
+      previewDot.position.copy(pos); previewDot.visible=true;
+      if(drawPath.length>0) { setPreviewLine(MD.verts[drawPath[drawPath.length-1]].pos,pos); pvLine.visible=true; }
+      else pvLine.visible=false;
+      updateMirrorPreviews(pos);
+    }
+    // Hover highlight
+    const vh=hitVerts(e);
+    const ni=vh.length>0?MD.verts.findIndex(v=>v.obj===vh[0].object):-1;
+    if(ni!==hoverIdx) {
+      if(hoverIdx!==-1&&MD.verts[hoverIdx])
+        MD.verts[hoverIdx].obj.material=mkV(hoverIdx===drawPath[0]&&drawPath.length>0?COL.vertStart:COL.vert);
+      hoverIdx=ni;
+      if(hoverIdx!==-1) {
+        MD.verts[hoverIdx].obj.material=mkV(COL.vertHov);
+        const needLen = strokeFaceMode ? 3 : 2;
+        if(hoverIdx===drawPath[0]&&drawPath.length>=needLen) setStatus(`✨ 始点をクリック → ${strokeFaceMode?'面を閉じる':'辺を閉じる'}！`);
+      }
+    }
+  }
+});
+
+renderer.domElement.addEventListener('wheel', e => {
+  e.preventDefault();
+  cam.radius=Math.max(.5,Math.min(150,cam.radius*(e.deltaY>0?1.12:.9)));
+  syncCamera();
+},{passive:false});
+
+renderer.domElement.addEventListener('click', e => {
+  if(wasDragging||tcDragging) return;
+  if(mode==='draw') handleDrawClick(e);
+  else              handleSelectClick(e);
+});
+renderer.domElement.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if(mode==='draw'&&drawPath.length>0) { cancelDraw(); setStatus('⛔ 描画キャンセル'); }
+});
+
+// ════════════════════════════════════════════
+//  UI CONTROLS
+// ════════════════════════════════════════════
+function setMode(m) {
+  mode=m; cancelDraw(); clearSelection();
+  previewDot.visible=m==='draw';
+  document.getElementById('btn-draw').className='tool-btn '+(m==='draw'?'active-draw':'');
+  document.getElementById('btn-select').className='tool-btn '+(m==='select'?'active':'');
+  document.getElementById('pill-mode').textContent=m==='draw'?'✏️ 頂点追加':'🖱️ 選択・編集';
+  container.className=m;
+  setStatus(m==='draw'?'✏️ クリックで頂点を追加':'🖱️ 頂点・辺・面をクリックして選択');
+}
+
+function toggleStrokeMode() {
+  strokeFaceMode=!strokeFaceMode;
+  const btn=document.getElementById('btn-stroke');
+  if(strokeFaceMode) {
+    btn.innerHTML='🔲<span class="lbl">面あり</span>';
+    btn.className='tool-btn active-draw';
+    setStatus('✏️ 面張りモード: 始点クリックで面を生成');
+  } else {
+    btn.innerHTML='✒️<span class="lbl">辺のみ</span>';
+    btn.className='tool-btn active-edge';
+    setStatus('✒️ 辺のみモード: 面を張らず辺だけ追加');
+  }
+}
+
+function setSelSub(s) {
+  clearSelection(); selSub=s;
+  ['vert','edge','face'].forEach(x=>document.getElementById('sel-'+x).className='sel-btn'+(x===s?' active':''));
+}
+function setGizmo(t) {
+  gizmoMode=t; tc.setMode(t);
+  ['translate','rotate','scale'].forEach(x=>document.getElementById('gz-'+x).className='gz-btn'+(x===t?' active':''));
+  if(tc.object===dummy&&dummyInfo) {
+    dummyInfo.initPos=dummy.position.clone(); dummyInfo.initQuat=dummy.quaternion.clone();
+    dummyInfo.initScale=dummy.scale.clone();
+    dummyInfo.initVerts=dummyInfo.targetVerts.map(vi=>MD.verts[vi].pos.clone());
+  }
+}
+function toggleSnap() {
+  snapEnabled=!snapEnabled;
+  document.getElementById('snap-btn').className=snapEnabled?'on':'';
+  document.getElementById('snap-btn').textContent=snapEnabled?'🧲 ON':'🧲 OFF';
+  const p=document.getElementById('pill-snap');
+  p.textContent=snapEnabled?'🧲 スナップ ON':'🧲 スナップ OFF';
+  p.className='status-pill '+(snapEnabled?'snap-on':'');
+}
+function setStatus(m) { document.getElementById('status-msg').textContent=m; }
+function updateStats() {
+  document.getElementById('sv').textContent=MD.verts.length;
+  document.getElementById('se').textContent=MD.edges.length;
+  document.getElementById('sf').textContent=MD.faces.length;
+}
+
+// Button wiring
+document.getElementById('btn-draw').onclick     = ()=>setMode('draw');
+document.getElementById('btn-select').onclick   = ()=>setMode('select');
+document.getElementById('btn-stroke').onclick   = toggleStrokeMode;
+document.getElementById('sel-vert').onclick     = ()=>{ setMode('select');setSelSub('vert'); };
+document.getElementById('sel-edge').onclick     = ()=>{ setMode('select');setSelSub('edge'); };
+document.getElementById('sel-face').onclick     = ()=>{ setMode('select');setSelSub('face'); };
+document.getElementById('gz-translate').onclick = ()=>setGizmo('translate');
+document.getElementById('gz-rotate').onclick    = ()=>setGizmo('rotate');
+document.getElementById('gz-scale').onclick     = ()=>setGizmo('scale');
+document.getElementById('snap-btn').onclick     = toggleSnap;
+document.getElementById('del-btn').onclick      = deleteSelected;
+document.getElementById('btn-undo').onclick     = undo;
+document.getElementById('btn-redo').onclick     = redo;
+document.getElementById('vb-free').onclick  = ()=>setView('free');
+document.getElementById('vb-top').onclick   = ()=>setView('top');
+document.getElementById('vb-front').onclick = ()=>setView('front');
+document.getElementById('vb-right').onclick = ()=>setView('right');
+document.getElementById('mir-x').onclick = ()=>toggleMirror('x');
+document.getElementById('mir-y').onclick = ()=>toggleMirror('y');
+document.getElementById('mir-z').onclick = ()=>toggleMirror('z');
+
+window.addEventListener('keydown', e => {
+  if(e.ctrlKey||e.metaKey) {
+    if(e.key.toLowerCase()==='z') { e.preventDefault(); undo(); return; }
+    if(e.key.toLowerCase()==='y') { e.preventDefault(); redo(); return; }
+    return;
+  }
+  if(e.key==='Tab')    { e.preventDefault(); setMode(mode==='draw'?'select':'draw'); }
+  if(e.key==='Escape') { mode==='draw'?cancelDraw():clearSelection(); }
+  if(e.key.toLowerCase()==='f') toggleStrokeMode();
+  if(e.key==='1') setView('front');
+  if(e.key==='3') setView('right');
+  if(e.key==='7') setView('top');
+  if(e.key==='0') setView('free');
+  if(e.key.toLowerCase()==='g') setGizmo('translate');
+  if(e.key.toLowerCase()==='r') setGizmo('rotate');
+  if(e.key.toLowerCase()==='s') setGizmo('scale');
+  if(e.key.toLowerCase()==='x') toggleSnap();
+  if(e.key==='Delete') deleteSelected();
+});
+
+// ════════════════════════════════════════════
+//  RESIZE
+// ════════════════════════════════════════════
+window.addEventListener('resize',()=>{
+  const w=container.clientWidth,h=container.clientHeight;
+  camera.aspect=w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h);
+});
+
+// ════════════════════════════════════════════
+//  RENDER LOOP
+// ════════════════════════════════════════════
+renderer.setAnimationLoop(()=>{
+  tickCameraAnim();
+  if(mirDirty) { rebuildMirrors(); mirDirty=false; }
+  renderer.render(scene,camera);
+});
+
+// ── INIT ────────────────────────────────────
+previewDot.visible=true;
+pushSnap();
+setView('free');
+updateHistUI();
+setStatus('✏️ クリックで頂点を追加 → 始点クリックで面を張る');
+</script>
+</body>
+</html>
